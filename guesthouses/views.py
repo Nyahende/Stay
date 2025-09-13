@@ -1,87 +1,47 @@
-from rest_framework import generics, permissions
-from .models import GuestHouse
-from .serializers import GuestHouseSerializer
-
-# List all guesthouses (for guests)
-from rest_framework import generics, permissions
-from .models import GuestHouse
-from .serializers import GuestHouseSerializer
-
-class GuestHouseListView(generics.ListAPIView):
-    serializer_class = GuestHouseSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        queryset = GuestHouse.objects.all()
-        region = self.request.query_params.get("region")
-        min_price = self.request.query_params.get("min_price")
-        max_price = self.request.query_params.get("max_price")
-        amenities = self.request.query_params.get("amenities")  # comma-separated
-
-        if region:
-            queryset = queryset.filter(region__iexact=region)
-
-        if min_price:
-            queryset = queryset.filter(price_per_night__gte=min_price)
-
-        if max_price:
-            queryset = queryset.filter(price_per_night__lte=max_price)
-
-        if amenities:
-            amenities_list = [a.strip().lower() for a in amenities.split(",")]
-            # Filter guesthouses containing ALL requested amenities
-            for amenity in amenities_list:
-                queryset = queryset.filter(amenities__icontains=amenity)
-
-        return queryset
-
-
-
-# Retrieve a single guesthouse detail
-class GuestHouseDetailView(generics.RetrieveAPIView):
-    queryset = GuestHouse.objects.all()
-    serializer_class = GuestHouseSerializer
-    permission_classes = [permissions.AllowAny]
-
-# Owner can create a guesthouse
-class GuestHouseCreateView(generics.CreateAPIView):
-    serializer_class = GuestHouseSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-
-# Owner can update their guesthouse
-class GuestHouseUpdateView(generics.RetrieveUpdateAPIView):
-    queryset = GuestHouse.objects.all()
-    serializer_class = GuestHouseSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        # Only allow owners to update their guesthouses
-        return self.queryset.filter(owner=self.request.user)
-
-
-from rest_framework.decorators import action
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import GuestHouse
+from .serializers import GuestHouseSerializer
+import logging
 
-class GuestHouseViewSet(viewsets.ModelViewSet):
-    queryset = GuestHouse.objects.all()
-    serializer_class = GuestHouseSerializer
-    permission_classes = [permissions.IsAuthenticated]
+logger = logging.getLogger(__name__)
 
-    def get_queryset(self):
-        # Owners can see only their guesthouses for updates
-        return self.queryset.filter(owner=self.request.user)
+class GuestHouseListView(APIView):
+    def get(self, request):
+        region = request.query_params.get('region')
+        min_price = request.query_params.get('min_price')
+        max_price = request.query_params.get('max_price')
+        search = request.query_params.get('search')
 
-    @action(detail=True, methods=["PATCH"])
-    def update_availability(self, request, pk=None):
-        guesthouse = self.get_object()
-        status_value = request.data.get("availability_status")
-        if status_value not in ["available", "few", "full"]:
-            return Response({"error": "Invalid availability status."}, status=status.HTTP_400_BAD_REQUEST)
-        guesthouse.availability_status = status_value
-        guesthouse.save()
-        return Response({"success": f"Availability updated to {status_value}"})
+        guest_houses = GuestHouse.objects.all()
+
+        if region:
+            guest_houses = guest_houses.filter(region=region)
+        if min_price:
+            guest_houses = guest_houses.filter(price_per_night__gte=min_price)
+        if max_price:
+            guest_houses = guest_houses.filter(price_per_night__lte=max_price)
+        if search:
+            guest_houses = guest_houses.filter(name__icontains=search)
+
+        serializer = GuestHouseSerializer(guest_houses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class GuestHouseCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'owner':
+            logger.error(f"Unauthorized guest house creation attempt by user {request.user.username}")
+            return Response({'error': 'Only owners can add guest houses'}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy()
+        data['owner'] = request.user.id
+        serializer = GuestHouseSerializer(data=data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Guest house created successfully'}, status=status.HTTP_201_CREATED)
+        logger.error(f"Guest house creation failed: {serializer.errors}")
+        return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

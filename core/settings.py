@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-+1q94j69i%&p+&6t-*2okq3*m!2k-96@@c!4!%m%y^2dmry!-s
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.99.187']
 
 
 # Application definition
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "guesthouses",
     "bookings",
+    'corsheaders',
 ]
 AUTH_USER_MODEL = "users.User"
 
@@ -52,6 +53,7 @@ REST_FRAMEWORK = {
 
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -59,6 +61,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8080",  # For Flutter web
+    "http://10.0.2.2:8000",  # For Android emulator
+    "http://10.182.180.61:8000",  # Your machine’s IP for physical device
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -132,3 +141,31 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ... other settings ...
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'michaelnyahende8@gmail.com'  # Your Gmail address
+EMAIL_HOST_PASSWORD = 'lniojymgdqnvlgnn'  # App Password from Google
+DEFAULT_FROM_EMAIL = 'michaelnyahende8@gmail.com'
+ALLOWED_HOSTS = ['10.182.180.61', 'localhost', '127.0.0.1', '0.0.0.0']
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+}
