@@ -29,19 +29,17 @@ class GuestHouseListView(APIView):
         serializer = GuestHouseSerializer(guest_houses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+# app/views.py
 class GuestHouseCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         if request.user.role != 'owner':
-            logger.error(f"Unauthorized guest house creation attempt by user {request.user.username}")
             return Response({'error': 'Only owners can add guest houses'}, status=status.HTTP_403_FORBIDDEN)
-
         data = request.data.copy()
         data['owner'] = request.user.id
         serializer = GuestHouseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response({'message': 'Guest house created successfully'}, status=status.HTTP_201_CREATED)
-        logger.error(f"Guest house creation failed: {serializer.errors}")
         return Response({'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
